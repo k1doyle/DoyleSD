@@ -64,16 +64,23 @@
     </main>
 
     <script>
-      const counterEl = document.getElementById("visit-count");
+  const counterEl = document.getElementById("visit-count");
 
-      fetch("https://api.counterapi.dev/v1/k1doyle-doylesd/homepage/up")
-        .then((response) => response.json())
-        .then((data) => {
-          counterEl.textContent = `Visitor #${Number(data.count).toLocaleString()}`;
-        })
-        .catch(() => {
-          counterEl.textContent = "Visitor count unavailable";
-        });
-    </script>
+  fetch("https://api.counterapi.dev/v1/k1doyle-doylesd/homepage/up")
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      counterEl.textContent = `Visitor #${Number(data.count).toLocaleString()}`;
+    })
+    .catch((error) => {
+      console.error("Counter error:", error);
+      counterEl.textContent = "Visitor count unavailable";
+    });
+</script>
+
   </body>
 </html>
