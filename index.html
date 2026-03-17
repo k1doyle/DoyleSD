@@ -66,10 +66,10 @@
     <script>
       const counterEl = document.getElementById("visit-count");
 
-      fetch("https://api.countapi.xyz/hit/k1doyle-doylesd/homepage")
+      fetch("https://api.counterapi.dev/v1/k1doyle-doylesd/homepage/up")
         .then((response) => response.json())
         .then((data) => {
-          counterEl.textContent = `Visitor #${Number(data.value).toLocaleString()}`;
+          counterEl.textContent = `Visitor #${Number(data.count).toLocaleString()}`;
         })
         .catch(() => {
           counterEl.textContent = "Visitor count unavailable";
