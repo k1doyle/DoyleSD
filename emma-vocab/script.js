@@ -579,18 +579,27 @@ function setActivePanel(panelId, options = {}) {
     tab.classList.toggle("is-active", tab.getAttribute("data-panel-target") === panelId);
   });
 
+  let activePanel = null;
+
   elements.modePanels.forEach((panel) => {
     const isActive = panel.id === panelId;
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
+
+    if (isActive) {
+      activePanel = panel;
+    }
   });
 
-  if (scroll) {
-    const panel = document.getElementById(panelId);
+  if (scroll && activePanel) {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const scrollBehavior = prefersReducedMotion ? "auto" : "smooth";
 
-    if (panel) {
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        activePanel.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+      });
+    });
   }
 }
 
