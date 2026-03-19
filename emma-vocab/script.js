@@ -1182,7 +1182,7 @@ elements.modeTabs.forEach((tab) => {
     const targetId = tab.getAttribute("data-panel-target");
 
     if (targetId) {
-      setActivePanel(targetId);
+      setActivePanel(targetId, { scroll: true });
     }
   });
 });
