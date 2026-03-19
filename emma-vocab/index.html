@@ -68,8 +68,32 @@
         </section>
       </header>
 
-      <main class="main-layout">
-        <section class="panel reveal" id="flashcard-panel">
+      <main class="study-hub reveal" id="study-hub">
+        <section class="mode-switcher" aria-label="Study sections">
+          <button
+            class="mode-tab is-active"
+            type="button"
+            data-panel-target="flashcard-panel"
+          >
+            <span class="mode-tab-label">Flashcards</span>
+            <span class="mode-tab-copy">Flip through the words one at a time.</span>
+          </button>
+          <button class="mode-tab" type="button" data-panel-target="quiz-panel">
+            <span class="mode-tab-label">Quiz</span>
+            <span class="mode-tab-copy">Multiple-choice, fill-in, and typed recall.</span>
+          </button>
+          <button class="mode-tab" type="button" data-panel-target="review-panel">
+            <span class="mode-tab-label">Missed Words</span>
+            <span class="mode-tab-copy">Focus on the terms that still need work.</span>
+          </button>
+          <button class="mode-tab" type="button" data-panel-target="word-bank-panel">
+            <span class="mode-tab-label">Word Bank</span>
+            <span class="mode-tab-copy">Open the full reference list when needed.</span>
+          </button>
+        </section>
+
+        <div class="mode-panels">
+        <section class="panel mode-panel reveal is-active" id="flashcard-panel">
           <div class="panel-heading">
             <div>
               <p class="section-kicker">Study Mode</p>
@@ -126,7 +150,7 @@
           </div>
         </section>
 
-        <section class="panel reveal" id="quiz-panel">
+        <section class="panel mode-panel reveal" id="quiz-panel" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">Quiz Mode</p>
@@ -148,6 +172,9 @@
                 type="button"
               >
                 Multiple choice
+              </button>
+              <button class="segment" id="fill-blank-mode" type="button">
+                Fill in the blank
               </button>
               <button class="segment" id="typed-mode" type="button">
                 Type the answer
@@ -195,8 +222,7 @@
           </div>
         </section>
 
-        <aside class="side-column">
-          <section class="panel reveal" id="review-panel">
+          <section class="panel mode-panel reveal" id="review-panel" hidden>
             <div class="panel-heading">
               <div>
                 <p class="section-kicker">Targeted Review</p>
@@ -225,7 +251,7 @@
             </div>
           </section>
 
-          <section class="panel reveal" id="word-bank-panel">
+          <section class="panel mode-panel reveal" id="word-bank-panel" hidden>
             <div class="panel-heading">
               <div>
                 <p class="section-kicker">Reference</p>
@@ -236,7 +262,7 @@
 
             <div class="word-bank-list" id="word-bank-list"></div>
           </section>
-        </aside>
+        </div>
       </main>
 
       <footer class="footer">

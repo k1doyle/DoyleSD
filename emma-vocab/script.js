@@ -404,6 +404,7 @@ const vocabWords = [
 const allWordIndexes = vocabWords.map((_, index) => index);
 
 const state = {
+  activePanel: "flashcard-panel",
   flashcardMode: "all",
   flashcardDeck: [...allWordIndexes],
   flashcardDeckPosition: 0,
@@ -457,6 +458,7 @@ const elements = {
   lightningStatus: document.querySelector("#lightning-status"),
   quizIntro: document.querySelector("#quiz-intro"),
   multipleChoiceMode: document.querySelector("#multiple-choice-mode"),
+  fillBlankMode: document.querySelector("#fill-blank-mode"),
   typedMode: document.querySelector("#typed-mode"),
   startLightning: document.querySelector("#start-lightning"),
   nextQuestion: document.querySelector("#next-question"),
@@ -467,6 +469,8 @@ const elements = {
   practiceAll: document.querySelector("#practice-all"),
   clearMissed: document.querySelector("#clear-missed"),
   wordBankList: document.querySelector("#word-bank-list"),
+  modeTabs: document.querySelectorAll("[data-panel-target]"),
+  modePanels: document.querySelectorAll(".mode-panel"),
   jumpButtons: document.querySelectorAll("[data-jump]"),
 };
 
@@ -493,6 +497,67 @@ function normalizeText(text) {
     .trim();
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function generateWordForms(word) {
+  const lowerWord = word.toLowerCase();
+  const forms = new Set([lowerWord]);
+
+  forms.add(`${lowerWord}s`);
+  forms.add(`${lowerWord}es`);
+  forms.add(`${lowerWord}ed`);
+  forms.add(`${lowerWord}ing`);
+
+  if (lowerWord.endsWith("e")) {
+    forms.add(`${lowerWord.slice(0, -1)}ed`);
+    forms.add(`${lowerWord.slice(0, -1)}ing`);
+  }
+
+  if (/[aeiou][bcdfghjklmnpqrstvwxyz]$/i.test(lowerWord)) {
+    const lastCharacter = lowerWord.slice(-1);
+    forms.add(`${lowerWord}${lastCharacter}ed`);
+    forms.add(`${lowerWord}${lastCharacter}ing`);
+  }
+
+  if (lowerWord.endsWith("y")) {
+    forms.add(`${lowerWord.slice(0, -1)}ies`);
+    forms.add(`${lowerWord.slice(0, -1)}ied`);
+  }
+
+  return [...forms];
+}
+
+function buildSentenceBlank(entry) {
+  const candidateSentences = shuffleList(entry.sentences);
+  const wordForms = generateWordForms(entry.word);
+
+  for (const sentence of candidateSentences) {
+    for (const form of wordForms) {
+      const matcher = new RegExp(`\\b${escapeRegExp(form)}\\b`, "i");
+
+      if (!matcher.test(sentence)) {
+        continue;
+      }
+
+      const matchedForm = sentence.match(matcher)?.[0] || form;
+
+      return {
+        originalSentence: sentence,
+        sentenceWithBlank: sentence.replace(matcher, "_______"),
+        matchedForm,
+      };
+    }
+  }
+
+  return {
+    originalSentence: entry.sentences[0],
+    sentenceWithBlank: `${entry.sentences[0]} Choose the vocab word that best fits the sentence above.`,
+    matchedForm: entry.word,
+  };
+}
+
 function clearLightningTimers() {
   if (state.lightningRound.timerId) {
     window.clearInterval(state.lightningRound.timerId);
@@ -502,6 +567,30 @@ function clearLightningTimers() {
   if (state.lightningRound.nextQuestionTimerId) {
     window.clearTimeout(state.lightningRound.nextQuestionTimerId);
     state.lightningRound.nextQuestionTimerId = null;
+  }
+}
+
+function setActivePanel(panelId, options = {}) {
+  const { scroll = false } = options;
+
+  state.activePanel = panelId;
+
+  elements.modeTabs.forEach((tab) => {
+    tab.classList.toggle("is-active", tab.getAttribute("data-panel-target") === panelId);
+  });
+
+  elements.modePanels.forEach((panel) => {
+    const isActive = panel.id === panelId;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+
+  if (scroll) {
+    const panel = document.getElementById(panelId);
+
+    if (panel) {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 }
 
@@ -531,8 +620,10 @@ function updateModeControls() {
     "is-active",
     state.quizFormat === "multiple-choice"
   );
+  elements.fillBlankMode.classList.toggle("is-active", state.quizFormat === "fill-blank");
   elements.typedMode.classList.toggle("is-active", state.quizFormat === "typed");
   elements.multipleChoiceMode.disabled = state.lightningRound.active;
+  elements.fillBlankMode.disabled = state.lightningRound.active;
   elements.typedMode.disabled = state.lightningRound.active;
 
   elements.nextQuestion.disabled = state.lightningRound.active;
@@ -551,6 +642,8 @@ function updateModeControls() {
   elements.quizIntro.textContent =
     state.quizFormat === "typed"
       ? "Type the vocab word that matches each definition."
+      : state.quizFormat === "fill-blank"
+        ? "Use the sentence clue and choose the vocab word that best completes the blank."
       : "Questions alternate between matching a word to its definition and matching a definition back to the correct word.";
 }
 
@@ -671,6 +764,34 @@ function buildQuestion() {
       placeholder: "Type the vocab word",
       answerLabel: correctEntry.word,
       mode: "typed",
+    };
+  }
+
+  if (state.quizFormat === "fill-blank") {
+    const distractors = shuffleList(
+      vocabWords.filter((entry) => entry.word !== correctEntry.word)
+    ).slice(0, 3);
+    const sentenceBlank = buildSentenceBlank(correctEntry);
+    const options = shuffleList([
+      { label: correctEntry.word, isCorrect: true },
+      ...distractors.map((entry) => ({
+        label: entry.word,
+        isCorrect: false,
+      })),
+    ]);
+
+    return {
+      word: correctEntry.word,
+      definition: correctEntry.definition,
+      sentence: sentenceBlank.matchedForm === correctEntry.word
+        ? sentenceBlank.originalSentence
+        : `${sentenceBlank.originalSentence} This sentence uses the form "${sentenceBlank.matchedForm}".`,
+      prompt: "Choose the vocab word that best completes this sentence.",
+      question: sentenceBlank.sentenceWithBlank,
+      typeLabel: "Fill in the blank",
+      options,
+      answerLabel: correctEntry.word,
+      mode: "multiple-choice",
     };
   }
 
@@ -1014,14 +1135,20 @@ elements.shuffleCards.addEventListener("click", () => {
   renderFlashcard();
 });
 elements.studyAllCards.addEventListener("click", () => {
+  setActivePanel("flashcard-panel");
   setFlashcardMode("all");
 });
 elements.studyMissedCards.addEventListener("click", () => {
+  setActivePanel("flashcard-panel");
   setFlashcardMode("missed", { shuffle: true });
 });
 
 elements.multipleChoiceMode.addEventListener("click", () => {
   state.quizFormat = "multiple-choice";
+  renderQuestion();
+});
+elements.fillBlankMode.addEventListener("click", () => {
+  state.quizFormat = "fill-blank";
   renderQuestion();
 });
 elements.typedMode.addEventListener("click", () => {
@@ -1033,10 +1160,12 @@ elements.startLightning.addEventListener("click", startLightningRound);
 elements.nextQuestion.addEventListener("click", renderQuestion);
 elements.shuffleQuiz.addEventListener("click", renderQuestion);
 elements.practiceMissed.addEventListener("click", () => {
+  setActivePanel("quiz-panel");
   state.quizScope = state.mistakes.size > 0 ? "missed" : "all";
   renderQuestion();
 });
 elements.practiceAll.addEventListener("click", () => {
+  setActivePanel("quiz-panel");
   state.quizScope = "all";
   renderQuestion();
 });
@@ -1048,13 +1177,22 @@ elements.clearMissed.addEventListener("click", () => {
   renderFlashcard();
 });
 
+elements.modeTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const targetId = tab.getAttribute("data-panel-target");
+
+    if (targetId) {
+      setActivePanel(targetId);
+    }
+  });
+});
+
 elements.jumpButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const targetId = button.getAttribute("data-jump");
-    const target = document.getElementById(targetId);
 
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (targetId) {
+      setActivePanel(targetId, { scroll: true });
     }
   });
 });
@@ -1092,3 +1230,4 @@ buildWordBank();
 renderMissedWords();
 renderFlashcard();
 renderQuestion();
+setActivePanel(state.activePanel);
