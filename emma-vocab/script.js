@@ -401,17 +401,31 @@ const vocabWords = [
   },
 ];
 
+const allWordIndexes = vocabWords.map((_, index) => index);
+
 const state = {
-  flashcardIndex: 0,
+  flashcardMode: "all",
+  flashcardDeck: [...allWordIndexes],
+  flashcardDeckPosition: 0,
   flashcardRevealed: false,
   viewedWords: new Set(),
   totalAnswers: 0,
   correctAnswers: 0,
   streak: 0,
   mistakes: new Map(),
-  quizMode: "all",
+  quizScope: "all",
+  quizFormat: "multiple-choice",
   currentQuestion: null,
   questionAnswered: false,
+  lightningRound: {
+    active: false,
+    remaining: 0,
+    correct: 0,
+    timeLeft: 0,
+    lastScore: "",
+    timerId: null,
+    nextQuestionTimerId: null,
+  },
 };
 
 const elements = {
@@ -425,15 +439,26 @@ const elements = {
   flashcardDefinition: document.querySelector("#flashcard-definition"),
   flashcardSentences: document.querySelector("#flashcard-sentences"),
   flashcardProgress: document.querySelector("#flashcard-progress"),
+  flashcardModeLabel: document.querySelector("#flashcard-mode-label"),
   revealCard: document.querySelector("#reveal-card"),
   previousCard: document.querySelector("#previous-card"),
   nextCard: document.querySelector("#next-card"),
   randomCard: document.querySelector("#random-card"),
+  shuffleCards: document.querySelector("#shuffle-cards"),
+  studyAllCards: document.querySelector("#study-all-cards"),
+  studyMissedCards: document.querySelector("#study-missed-cards"),
   questionType: document.querySelector("#question-type"),
   quizQuestion: document.querySelector("#quiz-question"),
   quizOptions: document.querySelector("#quiz-options"),
+  typedAnswerForm: document.querySelector("#typed-answer-form"),
+  typedAnswerInput: document.querySelector("#typed-answer-input"),
   quizFeedback: document.querySelector("#quiz-feedback"),
   quizModeLabel: document.querySelector("#quiz-mode-label"),
+  lightningStatus: document.querySelector("#lightning-status"),
+  quizIntro: document.querySelector("#quiz-intro"),
+  multipleChoiceMode: document.querySelector("#multiple-choice-mode"),
+  typedMode: document.querySelector("#typed-mode"),
+  startLightning: document.querySelector("#start-lightning"),
   nextQuestion: document.querySelector("#next-question"),
   shuffleQuiz: document.querySelector("#shuffle-quiz"),
   missedCount: document.querySelector("#missed-count"),
@@ -460,13 +485,73 @@ function randomItem(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function getQuizPool() {
-  if (state.quizMode === "missed" && state.mistakes.size > 0) {
-    return vocabWords.filter((entry) => state.mistakes.has(entry.word));
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function clearLightningTimers() {
+  if (state.lightningRound.timerId) {
+    window.clearInterval(state.lightningRound.timerId);
+    state.lightningRound.timerId = null;
   }
 
-  state.quizMode = "all";
-  return vocabWords;
+  if (state.lightningRound.nextQuestionTimerId) {
+    window.clearTimeout(state.lightningRound.nextQuestionTimerId);
+    state.lightningRound.nextQuestionTimerId = null;
+  }
+}
+
+function getWordIndexesForMode(mode) {
+  if (mode === "missed" && state.mistakes.size > 0) {
+    return allWordIndexes.filter((index) => state.mistakes.has(vocabWords[index].word));
+  }
+
+  return [...allWordIndexes];
+}
+
+function updateModeControls() {
+  elements.flashcardModeLabel.textContent =
+    state.flashcardMode === "missed" ? "Missed only" : "All words";
+
+  elements.quizModeLabel.textContent =
+    state.quizScope === "missed" && state.mistakes.size > 0
+      ? "Missed words only"
+      : "All words";
+
+  elements.studyMissedCards.disabled = state.mistakes.size === 0;
+  elements.practiceMissed.disabled = state.mistakes.size === 0 || state.lightningRound.active;
+  elements.practiceAll.disabled = state.lightningRound.active;
+  elements.clearMissed.disabled = state.mistakes.size === 0 || state.lightningRound.active;
+
+  elements.multipleChoiceMode.classList.toggle(
+    "is-active",
+    state.quizFormat === "multiple-choice"
+  );
+  elements.typedMode.classList.toggle("is-active", state.quizFormat === "typed");
+  elements.multipleChoiceMode.disabled = state.lightningRound.active;
+  elements.typedMode.disabled = state.lightningRound.active;
+
+  elements.nextQuestion.disabled = state.lightningRound.active;
+  elements.shuffleQuiz.disabled = state.lightningRound.active;
+  elements.startLightning.disabled = state.lightningRound.active;
+
+  if (state.lightningRound.active) {
+    elements.lightningStatus.textContent = `${state.lightningRound.remaining} left • ${state.lightningRound.timeLeft}s`;
+    elements.quizIntro.textContent =
+      "Lightning round is live. Answer quickly before the clock hits zero.";
+    return;
+  }
+
+  elements.lightningStatus.textContent =
+    state.lightningRound.lastScore || "10-question sprint";
+  elements.quizIntro.textContent =
+    state.quizFormat === "typed"
+      ? "Type the vocab word that matches each definition."
+      : "Questions alternate between matching a word to its definition and matching a definition back to the correct word.";
 }
 
 function updateStats() {
@@ -479,20 +564,50 @@ function updateStats() {
   elements.studiedCount.textContent = String(state.viewedWords.size);
   elements.accuracy.textContent = accuracyValue;
   elements.streak.textContent = String(state.streak);
-  elements.quizModeLabel.textContent =
-    state.quizMode === "missed" && state.mistakes.size > 0
-      ? "Missed words only"
-      : "All words";
+
+  updateModeControls();
+}
+
+function getCurrentFlashcardEntry() {
+  if (!state.flashcardDeck.length) {
+    state.flashcardDeck = [...allWordIndexes];
+    state.flashcardDeckPosition = 0;
+    state.flashcardMode = "all";
+  }
+
+  return vocabWords[state.flashcardDeck[state.flashcardDeckPosition]];
+}
+
+function setFlashcardMode(mode, options = {}) {
+  const { shuffle = false } = options;
+  let actualMode = mode;
+  let deck = getWordIndexesForMode(mode);
+
+  if (mode === "missed" && deck.length === 0) {
+    actualMode = "all";
+    deck = [...allWordIndexes];
+  }
+
+  state.flashcardMode = actualMode;
+  state.flashcardDeck = shuffle ? shuffleList(deck) : deck;
+  state.flashcardDeckPosition = 0;
+  state.flashcardRevealed = false;
+  renderFlashcard();
 }
 
 function renderFlashcard() {
-  const entry = vocabWords[state.flashcardIndex];
+  if (state.flashcardMode === "missed" && state.mistakes.size === 0) {
+    setFlashcardMode("all");
+    return;
+  }
+
+  const entry = getCurrentFlashcardEntry();
 
   state.viewedWords.add(entry.word);
 
   elements.flashcardWord.textContent = entry.word;
   elements.flashcardDefinition.textContent = entry.definition;
-  elements.flashcardProgress.textContent = `Card ${state.flashcardIndex + 1} of ${vocabWords.length}`;
+  elements.flashcardProgress.textContent = `Card ${state.flashcardDeckPosition + 1} of ${state.flashcardDeck.length}`;
 
   elements.flashcardSentences.replaceChildren(
     ...entry.sentences.map((sentence) => {
@@ -509,9 +624,11 @@ function renderFlashcard() {
   updateStats();
 }
 
-function setFlashcard(index) {
-  const boundedIndex = (index + vocabWords.length) % vocabWords.length;
-  state.flashcardIndex = boundedIndex;
+function moveFlashcard(step) {
+  const deckSize = state.flashcardDeck.length;
+
+  state.flashcardDeckPosition =
+    (state.flashcardDeckPosition + step + deckSize) % deckSize;
   state.flashcardRevealed = false;
   renderFlashcard();
 }
@@ -521,9 +638,42 @@ function toggleFlashcard() {
   renderFlashcard();
 }
 
+function getQuizPool() {
+  if (state.quizScope === "missed" && state.mistakes.size > 0) {
+    return vocabWords.filter((entry) => state.mistakes.has(entry.word));
+  }
+
+  state.quizScope = "all";
+  return vocabWords;
+}
+
 function buildQuestion() {
   const pool = getQuizPool();
-  const correctEntry = randomItem(pool);
+  let correctEntry = randomItem(pool);
+
+  if (
+    state.currentQuestion &&
+    pool.length > 1 &&
+    state.currentQuestion.word === correctEntry.word
+  ) {
+    const filteredPool = pool.filter((entry) => entry.word !== state.currentQuestion.word);
+    correctEntry = randomItem(filteredPool);
+  }
+
+  if (state.quizFormat === "typed") {
+    return {
+      word: correctEntry.word,
+      definition: correctEntry.definition,
+      sentence: correctEntry.sentences[0],
+      prompt: "Type the vocab word that matches this definition.",
+      question: correctEntry.definition,
+      typeLabel: "Typed recall",
+      placeholder: "Type the vocab word",
+      answerLabel: correctEntry.word,
+      mode: "typed",
+    };
+  }
+
   const questionType = Math.random() < 0.5 ? "word-to-definition" : "definition-to-word";
   const distractors = shuffleList(
     vocabWords.filter((entry) => entry.word !== correctEntry.word)
@@ -546,6 +696,8 @@ function buildQuestion() {
       question: correctEntry.word,
       typeLabel: "Word -> definition",
       options,
+      answerLabel: correctEntry.definition,
+      mode: "multiple-choice",
     };
   }
 
@@ -565,12 +717,27 @@ function buildQuestion() {
     question: correctEntry.definition,
     typeLabel: "Definition -> word",
     options,
+    answerLabel: correctEntry.word,
+    mode: "multiple-choice",
   };
 }
 
 function renderQuestion() {
-  if (state.quizMode === "missed" && state.mistakes.size === 0) {
-    state.quizMode = "all";
+  clearLightningTimers();
+
+  if (state.lightningRound.active) {
+    state.lightningRound.timerId = window.setInterval(() => {
+      state.lightningRound.timeLeft -= 1;
+      updateModeControls();
+
+      if (state.lightningRound.timeLeft <= 0) {
+        finishLightningRound("time");
+      }
+    }, 1000);
+  }
+
+  if (state.quizScope === "missed" && state.mistakes.size === 0) {
+    state.quizScope = "all";
   }
 
   state.currentQuestion = buildQuestion();
@@ -580,21 +747,60 @@ function renderQuestion() {
   elements.quizQuestion.textContent = state.currentQuestion.question;
   elements.quizFeedback.textContent = state.currentQuestion.prompt;
   elements.quizFeedback.className = "feedback";
-  elements.quizOptions.replaceChildren(
-    ...state.currentQuestion.options.map((option) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "option-button";
-      button.textContent = option.label;
-      button.addEventListener("click", () => handleAnswer(button, option.isCorrect));
-      return button;
-    })
-  );
+
+  if (state.currentQuestion.mode === "typed") {
+    elements.quizOptions.hidden = true;
+    elements.quizOptions.replaceChildren();
+    elements.typedAnswerForm.hidden = false;
+    elements.typedAnswerInput.value = "";
+    elements.typedAnswerInput.placeholder = state.currentQuestion.placeholder;
+    elements.typedAnswerInput.disabled = false;
+  } else {
+    elements.quizOptions.hidden = false;
+    elements.typedAnswerForm.hidden = true;
+    elements.typedAnswerInput.value = "";
+    elements.typedAnswerInput.disabled = true;
+    elements.quizOptions.replaceChildren(
+      ...state.currentQuestion.options.map((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "option-button";
+        button.textContent = option.label;
+        button.addEventListener("click", () => handleChoiceAnswer(button, option.isCorrect));
+        return button;
+      })
+    );
+  }
 
   updateStats();
 }
 
-function handleAnswer(button, isCorrect) {
+function finishLightningRound(reason) {
+  if (!state.lightningRound.active) {
+    return;
+  }
+
+  clearLightningTimers();
+
+  const answered = 10 - state.lightningRound.remaining;
+  const safeAnswered = answered === 0 ? 1 : answered;
+  const scoreLine = `${state.lightningRound.correct}/${answered || 0}`;
+  const accuracy = Math.round((state.lightningRound.correct / safeAnswered) * 100);
+
+  state.lightningRound.active = false;
+  state.lightningRound.lastScore = `Last round: ${scoreLine}`;
+
+  elements.quizFeedback.className = "feedback is-correct";
+  elements.quizFeedback.innerHTML = `
+    <strong>${reason === "time" ? "Time ran out." : "Lightning round complete."}</strong>
+    Score: ${scoreLine} correct.<br />
+    Accuracy: ${accuracy}%.
+  `;
+
+  updateStats();
+}
+
+function applyAnswerOutcome(isCorrect, details = {}) {
   if (!state.currentQuestion || state.questionAnswered) {
     return;
   }
@@ -602,23 +808,32 @@ function handleAnswer(button, isCorrect) {
   state.questionAnswered = true;
   state.totalAnswers += 1;
 
-  const optionButtons = [...elements.quizOptions.querySelectorAll(".option-button")];
+  if (state.currentQuestion.mode === "multiple-choice") {
+    const optionButtons = [...elements.quizOptions.querySelectorAll(".option-button")];
 
-  optionButtons.forEach((optionButton) => {
-    const matchesCorrect = optionButton.textContent ===
-      state.currentQuestion.options.find((option) => option.isCorrect).label;
+    optionButtons.forEach((optionButton) => {
+      const matchesCorrect = optionButton.textContent === state.currentQuestion.answerLabel;
+      optionButton.disabled = true;
+      optionButton.classList.toggle("is-correct", matchesCorrect);
+    });
 
-    optionButton.disabled = true;
-    optionButton.classList.toggle("is-correct", matchesCorrect);
-  });
+    if (details.button && !isCorrect) {
+      details.button.classList.add("is-wrong");
+    }
+  } else {
+    elements.typedAnswerInput.disabled = true;
+  }
 
   if (isCorrect) {
     state.correctAnswers += 1;
     state.streak += 1;
-    button.classList.add("is-correct");
 
-    if (state.quizMode === "missed") {
+    if (state.quizScope === "missed") {
       state.mistakes.delete(state.currentQuestion.word);
+    }
+
+    if (state.lightningRound.active) {
+      state.lightningRound.correct += 1;
     }
 
     elements.quizFeedback.className = "feedback is-correct";
@@ -629,7 +844,6 @@ function handleAnswer(button, isCorrect) {
     `;
   } else {
     state.streak = 0;
-    button.classList.add("is-wrong");
     state.mistakes.set(
       state.currentQuestion.word,
       (state.mistakes.get(state.currentQuestion.word) || 0) + 1
@@ -645,12 +859,61 @@ function handleAnswer(button, isCorrect) {
 
   renderMissedWords();
   updateStats();
+
+  if (state.lightningRound.active) {
+    state.lightningRound.remaining -= 1;
+    updateModeControls();
+
+    if (state.lightningRound.remaining <= 0) {
+      state.lightningRound.nextQuestionTimerId = window.setTimeout(() => {
+        finishLightningRound("complete");
+      }, 850);
+      return;
+    }
+
+    state.lightningRound.nextQuestionTimerId = window.setTimeout(() => {
+      renderQuestion();
+    }, 850);
+  }
+}
+
+function handleChoiceAnswer(button, isCorrect) {
+  applyAnswerOutcome(isCorrect, { button });
+}
+
+function handleTypedAnswer(event) {
+  event.preventDefault();
+
+  if (!state.currentQuestion || state.questionAnswered) {
+    return;
+  }
+
+  const typedAnswer = normalizeText(elements.typedAnswerInput.value);
+  const correctAnswer = normalizeText(state.currentQuestion.word);
+
+  if (!typedAnswer) {
+    elements.quizFeedback.className = "feedback";
+    elements.quizFeedback.textContent = "Type a word first, then check your answer.";
+    return;
+  }
+
+  applyAnswerOutcome(typedAnswer === correctAnswer);
 }
 
 function renderMissedWords() {
   const missedEntries = [...state.mistakes.entries()].sort((left, right) => right[1] - left[1]);
 
   elements.missedCount.textContent = `${missedEntries.length} tracked`;
+
+  if (state.flashcardMode === "missed" && missedEntries.length === 0) {
+    state.flashcardMode = "all";
+    state.flashcardDeck = [...allWordIndexes];
+    state.flashcardDeckPosition = 0;
+  }
+
+  if (state.quizScope === "missed" && missedEntries.length === 0 && !state.lightningRound.active) {
+    state.quizScope = "all";
+  }
 
   if (missedEntries.length === 0) {
     elements.missedList.replaceChildren();
@@ -659,6 +922,7 @@ function renderMissedWords() {
     emptyState.className = "review-copy";
     emptyState.textContent = "No missed words yet. Once Emma misses a quiz question, it will show up here.";
     elements.missedList.appendChild(emptyState);
+    updateModeControls();
     return;
   }
 
@@ -670,6 +934,8 @@ function renderMissedWords() {
       return chip;
     })
   );
+
+  updateModeControls();
 }
 
 function buildWordBank() {
@@ -705,35 +971,81 @@ function buildWordBank() {
   );
 }
 
-elements.flashcard.addEventListener("click", toggleFlashcard);
-elements.revealCard.addEventListener("click", toggleFlashcard);
-elements.previousCard.addEventListener("click", () => setFlashcard(state.flashcardIndex - 1));
-elements.nextCard.addEventListener("click", () => setFlashcard(state.flashcardIndex + 1));
-elements.randomCard.addEventListener("click", () => {
-  let nextIndex = state.flashcardIndex;
-
-  while (nextIndex === state.flashcardIndex && vocabWords.length > 1) {
-    nextIndex = Math.floor(Math.random() * vocabWords.length);
+function startLightningRound() {
+  if (state.lightningRound.active) {
+    return;
   }
 
-  setFlashcard(nextIndex);
+  clearLightningTimers();
+  state.quizFormat = "multiple-choice";
+  state.quizScope = "all";
+  state.lightningRound.active = true;
+  state.lightningRound.remaining = 10;
+  state.lightningRound.correct = 0;
+  state.lightningRound.timeLeft = 60;
+  state.lightningRound.lastScore = "";
+
+  renderQuestion();
+}
+
+elements.flashcard.addEventListener("click", toggleFlashcard);
+elements.revealCard.addEventListener("click", toggleFlashcard);
+elements.previousCard.addEventListener("click", () => moveFlashcard(-1));
+elements.nextCard.addEventListener("click", () => moveFlashcard(1));
+elements.randomCard.addEventListener("click", () => {
+  if (state.flashcardDeck.length <= 1) {
+    return;
+  }
+
+  let nextPosition = state.flashcardDeckPosition;
+
+  while (nextPosition === state.flashcardDeckPosition) {
+    nextPosition = Math.floor(Math.random() * state.flashcardDeck.length);
+  }
+
+  state.flashcardDeckPosition = nextPosition;
+  state.flashcardRevealed = false;
+  renderFlashcard();
+});
+elements.shuffleCards.addEventListener("click", () => {
+  state.flashcardDeck = shuffleList(state.flashcardDeck);
+  state.flashcardDeckPosition = 0;
+  state.flashcardRevealed = false;
+  renderFlashcard();
+});
+elements.studyAllCards.addEventListener("click", () => {
+  setFlashcardMode("all");
+});
+elements.studyMissedCards.addEventListener("click", () => {
+  setFlashcardMode("missed", { shuffle: true });
 });
 
+elements.multipleChoiceMode.addEventListener("click", () => {
+  state.quizFormat = "multiple-choice";
+  renderQuestion();
+});
+elements.typedMode.addEventListener("click", () => {
+  state.quizFormat = "typed";
+  renderQuestion();
+});
+elements.typedAnswerForm.addEventListener("submit", handleTypedAnswer);
+elements.startLightning.addEventListener("click", startLightningRound);
 elements.nextQuestion.addEventListener("click", renderQuestion);
 elements.shuffleQuiz.addEventListener("click", renderQuestion);
 elements.practiceMissed.addEventListener("click", () => {
-  state.quizMode = state.mistakes.size > 0 ? "missed" : "all";
+  state.quizScope = state.mistakes.size > 0 ? "missed" : "all";
   renderQuestion();
 });
 elements.practiceAll.addEventListener("click", () => {
-  state.quizMode = "all";
+  state.quizScope = "all";
   renderQuestion();
 });
 elements.clearMissed.addEventListener("click", () => {
   state.mistakes.clear();
-  state.quizMode = "all";
+  state.quizScope = "all";
   renderMissedWords();
   renderQuestion();
+  renderFlashcard();
 });
 
 elements.jumpButtons.forEach((button) => {

@@ -75,7 +75,12 @@
               <p class="section-kicker">Study Mode</p>
               <h2>Flashcards</h2>
             </div>
-            <p class="mini-pill" id="flashcard-progress">Card 1</p>
+            <div class="pill-row">
+              <p class="mini-pill" id="flashcard-progress">Card 1</p>
+              <p class="mini-pill mini-pill-muted" id="flashcard-mode-label">
+                All words
+              </p>
+            </div>
           </div>
 
           <button class="flashcard" id="flashcard" type="button" aria-live="polite">
@@ -106,6 +111,18 @@
             <button class="button button-ghost" id="random-card" type="button">
               Random card
             </button>
+            <button class="button button-ghost" id="shuffle-cards" type="button">
+              Shuffle deck
+            </button>
+          </div>
+
+          <div class="panel-actions panel-actions-secondary">
+            <button class="button button-secondary" id="study-all-cards" type="button">
+              Study all words
+            </button>
+            <button class="button button-secondary" id="study-missed-cards" type="button">
+              Study missed words
+            </button>
           </div>
         </section>
 
@@ -115,10 +132,34 @@
               <p class="section-kicker">Quiz Mode</p>
               <h2>Multiple-choice quiz</h2>
             </div>
-            <p class="mini-pill" id="quiz-mode-label">All words</p>
+            <div class="pill-row">
+              <p class="mini-pill" id="quiz-mode-label">All words</p>
+              <p class="mini-pill mini-pill-muted" id="lightning-status">
+                10-question sprint
+              </p>
+            </div>
           </div>
 
-          <p class="quiz-intro">
+          <div class="quiz-toolbar">
+            <div class="segmented-control" aria-label="Quiz format">
+              <button
+                class="segment is-active"
+                id="multiple-choice-mode"
+                type="button"
+              >
+                Multiple choice
+              </button>
+              <button class="segment" id="typed-mode" type="button">
+                Type the answer
+              </button>
+            </div>
+
+            <button class="button button-ghost" id="start-lightning" type="button">
+              Start lightning round
+            </button>
+          </div>
+
+          <p class="quiz-intro" id="quiz-intro">
             Questions alternate between matching a word to its definition and
             matching a definition back to the correct word.
           </p>
@@ -127,6 +168,19 @@
             <p class="question-type" id="question-type"></p>
             <h3 class="quiz-question" id="quiz-question"></h3>
             <div class="option-grid" id="quiz-options"></div>
+            <form class="typed-answer" id="typed-answer-form" hidden>
+              <label class="sr-only" for="typed-answer-input">Type the answer</label>
+              <input
+                class="typed-answer-field"
+                id="typed-answer-input"
+                type="text"
+                autocomplete="off"
+                placeholder="Type the vocab word"
+              />
+              <button class="button button-primary" type="submit">
+                Check answer
+              </button>
+            </form>
           </div>
 
           <div class="feedback" id="quiz-feedback" aria-live="polite"></div>

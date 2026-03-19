@@ -6,8 +6,12 @@ A lightweight, no-build study app for Emma's English vocabulary review.
 
 - Flashcards for each vocab word
 - Multiple-choice quiz with mixed question types
+- Typed recall mode for entering the vocab word
 - Accuracy and streak tracking
 - Automatic missed-word review list
+- Missed-word flashcard and quiz practice
+- Lightning round for a quick 10-question sprint
+- Flashcard deck shuffling
 - Full word bank with definitions and example sentences
 
 ## How To Use It

@@ -294,6 +294,13 @@ h2 {
   margin-bottom: 1rem;
 }
 
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
 .mini-pill {
   display: inline-flex;
   align-items: center;
@@ -305,6 +312,11 @@ h2 {
   color: var(--accent-deep);
   font-weight: 800;
   text-align: center;
+}
+
+.mini-pill-muted {
+  background: rgba(255, 248, 238, 0.92);
+  border: 1px solid rgba(140, 59, 18, 0.12);
 }
 
 .flashcard {
@@ -368,6 +380,47 @@ h2 {
   margin-top: 1rem;
 }
 
+.panel-actions-secondary {
+  margin-top: 0.75rem;
+}
+
+.quiz-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.segmented-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 248, 238, 0.88);
+}
+
+.segment {
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.segment.is-active {
+  color: #fff7ef;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+}
+
 .quiz-intro {
   margin-bottom: 1rem;
 }
@@ -392,6 +445,27 @@ h2 {
   display: grid;
   gap: 0.75rem;
   margin-top: 1rem;
+}
+
+.typed-answer {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.typed-answer-field {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 252, 247, 0.96);
+  color: var(--text);
+}
+
+.typed-answer-field:focus-visible {
+  outline: 3px solid rgba(213, 104, 47, 0.25);
+  outline-offset: 3px;
 }
 
 .option-button {
@@ -421,6 +495,13 @@ h2 {
 
 .option-button:disabled {
   cursor: default;
+}
+
+.button:disabled,
+.segment:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .feedback {
@@ -514,6 +595,18 @@ h2 {
   text-align: center;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .reveal {
   opacity: 0;
   transform: translateY(22px);
@@ -556,6 +649,10 @@ h2 {
 
   .panel-heading {
     flex-direction: column;
+  }
+
+  .pill-row {
+    justify-content: flex-start;
   }
 }
 
