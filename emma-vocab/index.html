@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emma's Vocab Sprint</title>
+    <meta
+      name="description"
+      content="A simple flashcard and quiz app for Emma's English vocabulary exam."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero reveal">
+        <p class="eyebrow">English Vocabulary Exam Prep</p>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 id="top">Emma's Vocab Sprint</h1>
+            <p class="lede">
+              Flip through the words, reveal the definitions, then jump into a
+              mixed multiple-choice quiz. Missed words are tracked automatically
+              so the tricky ones can get extra practice tonight.
+            </p>
+            <div class="hero-actions">
+              <button class="button button-primary" type="button" data-jump="flashcard-panel">
+                Start with flashcards
+              </button>
+              <button class="button button-secondary" type="button" data-jump="quiz-panel">
+                Jump to the quiz
+              </button>
+            </div>
+          </div>
+
+          <aside class="hero-note">
+            <p class="note-title">Fast study plan</p>
+            <ol class="tip-list">
+              <li>Say the definition out loud before revealing the answer.</li>
+              <li>Use the quiz until the missed-word list gets smaller.</li>
+              <li>Finish with a quick scan of the full word bank.</li>
+            </ol>
+          </aside>
+        </div>
+
+        <section class="stat-grid" aria-label="Study stats">
+          <article class="stat-card">
+            <p class="stat-label">Words in set</p>
+            <p class="stat-value" id="total-words">0</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">Flashcards viewed</p>
+            <p class="stat-value" id="studied-count">0</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">Quiz accuracy</p>
+            <p class="stat-value" id="accuracy">0%</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">Current streak</p>
+            <p class="stat-value" id="streak">0</p>
+          </article>
+        </section>
+      </header>
+
+      <main class="main-layout">
+        <section class="panel reveal" id="flashcard-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">Study Mode</p>
+              <h2>Flashcards</h2>
+            </div>
+            <p class="mini-pill" id="flashcard-progress">Card 1</p>
+          </div>
+
+          <button class="flashcard" id="flashcard" type="button" aria-live="polite">
+            <div class="flashcard-face flashcard-front">
+              <p class="face-label">Front</p>
+              <h3 id="flashcard-word">Word</h3>
+              <p class="face-hint">Think of the definition, then tap to reveal.</p>
+            </div>
+            <div class="flashcard-face flashcard-back" id="flashcard-answer" hidden>
+              <p class="face-label">Back</p>
+              <p class="back-label">Definition</p>
+              <p class="definition" id="flashcard-definition"></p>
+              <p class="back-label">Example sentences</p>
+              <ul class="sentence-list" id="flashcard-sentences"></ul>
+            </div>
+          </button>
+
+          <div class="panel-actions">
+            <button class="button button-secondary" id="previous-card" type="button">
+              Previous
+            </button>
+            <button class="button button-primary" id="reveal-card" type="button">
+              Reveal answer
+            </button>
+            <button class="button button-secondary" id="next-card" type="button">
+              Next
+            </button>
+            <button class="button button-ghost" id="random-card" type="button">
+              Random card
+            </button>
+          </div>
+        </section>
+
+        <section class="panel reveal" id="quiz-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">Quiz Mode</p>
+              <h2>Multiple-choice quiz</h2>
+            </div>
+            <p class="mini-pill" id="quiz-mode-label">All words</p>
+          </div>
+
+          <p class="quiz-intro">
+            Questions alternate between matching a word to its definition and
+            matching a definition back to the correct word.
+          </p>
+
+          <div class="quiz-card">
+            <p class="question-type" id="question-type"></p>
+            <h3 class="quiz-question" id="quiz-question"></h3>
+            <div class="option-grid" id="quiz-options"></div>
+          </div>
+
+          <div class="feedback" id="quiz-feedback" aria-live="polite"></div>
+
+          <div class="panel-actions">
+            <button class="button button-primary" id="next-question" type="button">
+              Next question
+            </button>
+            <button class="button button-secondary" id="shuffle-quiz" type="button">
+              Shuffle question
+            </button>
+          </div>
+        </section>
+
+        <aside class="side-column">
+          <section class="panel reveal" id="review-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Targeted Review</p>
+                <h2>Missed words</h2>
+              </div>
+              <p class="mini-pill" id="missed-count">0 tracked</p>
+            </div>
+
+            <p class="review-copy">
+              Every missed quiz answer lands here so Emma can focus on the
+              hardest terms instead of restarting the whole list.
+            </p>
+
+            <div class="chip-list" id="missed-list"></div>
+
+            <div class="stacked-actions">
+              <button class="button button-primary" id="practice-missed" type="button">
+                Practice missed words
+              </button>
+              <button class="button button-secondary" id="practice-all" type="button">
+                Back to all words
+              </button>
+              <button class="button button-ghost" id="clear-missed" type="button">
+                Clear missed list
+              </button>
+            </div>
+          </section>
+
+          <section class="panel reveal" id="word-bank-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Reference</p>
+                <h2>Full word bank</h2>
+              </div>
+              <p class="mini-pill">Tap any word</p>
+            </div>
+
+            <div class="word-bank-list" id="word-bank-list"></div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer">
+        <p>Built for Emma's vocab review session.</p>
+      </footer>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
